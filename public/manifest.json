@@ -1,0 +1,21 @@
+{
+  "name": "Kisan Setu - Digital Agriculture Platform",
+  "short_name": "Kisan Setu",
+  "description": "Technology that connects every farmer to a better harvest.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F9FAF7",
+  "theme_color": "#154D30",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
