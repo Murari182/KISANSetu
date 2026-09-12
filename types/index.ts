@@ -285,3 +285,161 @@ export interface MLModelMetric {
   avgLatencyMs: number;
   lastUpdated: string;
 }
+
+/* =========================================================================
+   SMART PROCUREMENT TYPES (CORE SIH FEATURE)
+   ========================================================================= */
+
+export type CentreStatus = "OPEN" | "BUSY" | "CLOSED";
+
+export interface ProcurementCentre {
+  id: string;
+  name: string;
+  code: string;
+  district: string;
+  state: string;
+  address: string;
+  distanceKm: number;
+  status: CentreStatus;
+  activeCounters: number;
+  totalCounters: number;
+  currentServingToken: string;
+  queueLength: number;
+  avgProcessingTimeMinutes: number;
+  operatingHours: string;
+  availableSlotsCount: number;
+  cropsSupported: string[];
+  contactPhone: string;
+  coordinates: {
+    lat: number;
+    lng: number;
+  };
+  isRecommended?: boolean;
+  recommendationReason?: string;
+}
+
+export type SlotAvailability = "AVAILABLE" | "LIMITED" | "FULL";
+
+export interface ProcurementSlot {
+  id: string;
+  centreId: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  displayTime: string;
+  capacity: number;
+  bookedCount: number;
+  status: SlotAvailability;
+}
+
+export type ProcurementJourneyStage =
+  | "SLOT_BOOKED"
+  | "TOKEN_GENERATED"
+  | "ARRIVED"
+  | "WEIGHING"
+  | "QUALITY_CHECK"
+  | "PROCUREMENT_COMPLETED"
+  | "PAYMENT_INITIATED"
+  | "PAYMENT_RECEIVED";
+
+export interface QueueTokenNode {
+  token: string;
+  farmerName: string;
+  crop: string;
+  position: number;
+  status: "serving" | "waiting" | "called" | "completed";
+  counterNumber?: number;
+  estimatedWaitMinutes: number;
+  isCurrentUser?: boolean;
+}
+
+export interface QueueLiveState {
+  centreId: string;
+  centreName: string;
+  currentlyServing: string;
+  activeCounters: number;
+  totalWaiting: number;
+  avgProcessingTimeMinutes: number;
+  currentLoadPercent: number;
+  tokensInQueue: QueueTokenNode[];
+  lastUpdated: string;
+}
+
+export interface AiEtaPrediction {
+  estimatedWaitingMinutes: number;
+  confidence: "High" | "Moderate" | "Low";
+  recommendedArrivalTime: string;
+  slotTime: string;
+  factors: {
+    queueLengthAhead: number;
+    activeCounters: number;
+    avgSpeedMinPerToken: number;
+    loadFactor: number;
+  };
+  explanation: string;
+  modelVersion: string;
+}
+
+export interface ProcurementBooking {
+  id: string;
+  bookingCode: string;
+  farmerId: string;
+  farmerName: string;
+  farmerPhone: string;
+  farmId: string;
+  farmName: string;
+  cropName: string;
+  commodity: string;
+  variety?: string;
+  estimatedQuantityKg: number;
+  centreId: string;
+  centreName: string;
+  centreAddress: string;
+  date: string;
+  slotTime: string;
+  tokenNumber: string;
+  queuePosition: number;
+  estimatedWaitMinutes: number;
+  stage: ProcurementJourneyStage;
+  stageDetails?: string;
+  recommendedArrivalTime: string;
+  createdAt: string;
+  arrivedAt?: string;
+  completedAt?: string;
+  actualQuantityKg?: number;
+  mspPerQuintal?: number;
+  totalAmount?: number;
+  paymentStatus?: "PENDING" | "PROCESSING" | "PAID";
+  transactionId?: string;
+  paymentDate?: string;
+  bankAccountMasked?: string;
+  securityHash?: string;
+}
+
+export interface ProcurementPayment {
+  id: string;
+  bookingId: string;
+  tokenNumber: string;
+  farmerName: string;
+  farmerPhone: string;
+  crop: string;
+  variety: string;
+  quantityKg: number;
+  mspRatePerQuintal: number;
+  totalAmount: number;
+  status: "PROCESSING" | "PAID";
+  transactionId: string;
+  dbtReference: string;
+  accountMasked: string;
+  bankName: string;
+  completedDate: string;
+  expectedPaymentDate: string;
+  stageTimestamps: {
+    weighingCompletedAt: string;
+    qualityPassedAt: string;
+    procurementClosedAt: string;
+    dbtInitiatedAt: string;
+    paymentCreditedAt?: string;
+  };
+}
+

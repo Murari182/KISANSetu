@@ -13,7 +13,21 @@ import {
   DiseasePrediction,
   MLModelMetric,
   AlertNotification,
+  ProcurementCentre,
+  ProcurementSlot,
+  ProcurementBooking,
+  ProcurementPayment,
+  QueueLiveState,
+  ProcurementJourneyStage,
 } from "@/types";
+import {
+  DEFAULT_PROCUREMENT_CENTRES,
+  generateDailySlots,
+  INITIAL_DEFAULT_BOOKING,
+  INITIAL_DEFAULT_PAYMENT,
+  buildLiveQueueState,
+  predictProcurementEta,
+} from "@/lib/data/procurement";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://api.kisansetu.in/v1";
 
@@ -899,3 +913,283 @@ export const alertApi = {
     }
   },
 };
+
+/* =========================================================================
+   SMART PROCUREMENT SERVICE (PRIMARY SIH CORE FEATURE)
+   ========================================================================= */
+
+const BOOKING_STORAGE_KEY = "kisan_procurement_active_booking";
+const PAYMENT_STORAGE_KEY = "kisan_procurement_active_payment";
+const QUEUE_SERVING_KEY = "kisan_procurement_serving_num";
+
+export const procurementApi = {
+  async getCentres(district?: string): Promise<ProcurementCentre[]> {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("kisan_procurement_centres");
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch (e) {}
+      }
+    }
+    return DEFAULT_PROCUREMENT_CENTRES;
+  },
+
+  async getSlots(centreId: string, date: string): Promise<ProcurementSlot[]> {
+    return generateDailySlots(centreId, date);
+  },
+
+  async getActiveBooking(): Promise<ProcurementBooking> {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem(BOOKING_STORAGE_KEY);
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch (e) {}
+      }
+    }
+    return INITIAL_DEFAULT_BOOKING;
+  },
+
+  async saveBooking(booking: ProcurementBooking): Promise<void> {
+    if (typeof window !== "undefined") {
+      localStorage.setItem(BOOKING_STORAGE_KEY, JSON.stringify(booking));
+    }
+  },
+
+  async createBooking(data: {
+    cropName: string;
+    commodity: string;
+    variety?: string;
+    estimatedQuantityKg: number;
+    centreId: string;
+    date: string;
+    slotTime: string;
+    farmerName: string;
+    farmerPhone: string;
+    farmName: string;
+  }): Promise<ProcurementBooking> {
+    const centres = await this.getCentres();
+    const centre = centres.find((c) => c.id === data.centreId) || centres[0];
+    const randomTokenNum = Math.floor(140 + Math.random() * 40);
+    const tokenNumber = `A${randomTokenNum}`;
+    const queuePosition = randomTokenNum - 130;
+    const wait = Math.max(8, Math.round((queuePosition / centre.activeCounters) * centre.avgProcessingTimeMinutes));
+
+    const newBooking: ProcurementBooking = {
+      id: `book-${Date.now()}`,
+      bookingCode: `KS-PROC-2026-${Math.floor(1000 + Math.random() * 9000)}`,
+      farmerId: "usr-farmer-101",
+      farmerName: data.farmerName,
+      farmerPhone: data.farmerPhone,
+      farmId: "farm-1",
+      farmName: data.farmName,
+      cropName: data.cropName,
+      commodity: data.commodity,
+      variety: data.variety || "Verified Mandi Variety",
+      estimatedQuantityKg: data.estimatedQuantityKg,
+      centreId: centre.id,
+      centreName: centre.name,
+      centreAddress: centre.address,
+      date: data.date,
+      slotTime: data.slotTime,
+      tokenNumber,
+      queuePosition,
+      estimatedWaitMinutes: wait,
+      stage: "TOKEN_GENERATED",
+      stageDetails: "Slot confirmed. Digital token active. Arrive with certainty at scheduled time.",
+      recommendedArrivalTime: "10:20 AM",
+      createdAt: new Date().toISOString(),
+      actualQuantityKg: data.estimatedQuantityKg,
+      mspPerQuintal: 2300,
+      totalAmount: Math.round((data.estimatedQuantityKg / 100) * 2300),
+      paymentStatus: "PENDING",
+      transactionId: `KS-DBT-${Math.floor(100000 + Math.random() * 900000)}`,
+      bankAccountMasked: "SBI •••• 4092",
+      securityHash: `SHA256:${Math.random().toString(36).substring(2, 12)}`,
+    };
+
+    await this.saveBooking(newBooking);
+
+    // Also trigger notification
+    await this.triggerProcurementAlert(
+      "Your procurement slot is confirmed.",
+      `Digital Token ${tokenNumber} generated for ${centre.name} on ${data.date} (${data.slotTime}).`,
+      "info"
+    );
+
+    return newBooking;
+  },
+
+  async getLiveQueue(centreId: string = "centre-mandal"): Promise<QueueLiveState> {
+    let servingNum = 130;
+    if (typeof window !== "undefined") {
+      const savedServing = localStorage.getItem(QUEUE_SERVING_KEY);
+      if (savedServing) {
+        servingNum = parseInt(savedServing, 10) || 130;
+      }
+    }
+    const booking = await this.getActiveBooking();
+    const tokenNum = parseInt(booking.tokenNumber.replace(/\D/g, ""), 10) || 142;
+    return buildLiveQueueState(centreId, servingNum, tokenNum);
+  },
+
+  async updateBookingStage(
+    bookingId: string,
+    stage: ProcurementJourneyStage,
+    details?: string
+  ): Promise<ProcurementBooking> {
+    const booking = await this.getActiveBooking();
+    const updated: ProcurementBooking = {
+      ...booking,
+      stage,
+      stageDetails: details || booking.stageDetails,
+    };
+
+    if (stage === "ARRIVED") {
+      updated.arrivedAt = "10:18 AM";
+      updated.stageDetails = "Checked in at gate. Weighbridge entry assigned to Ramp 2.";
+      await this.triggerProcurementAlert(
+        "Gate Check-in Confirmed",
+        `Token ${updated.tokenNumber} verified at security gate. Proceed to Electronic Weighbridge Ramp 2.`,
+        "info"
+      );
+    } else if (stage === "WEIGHING") {
+      updated.stageDetails = "Gross weight recorded: 3,420 kg. Tare weight deducted. Net: 1,480 kg.";
+      await this.triggerProcurementAlert(
+        "Electronic Weighing in Progress",
+        `Net weight recorded: 1,480 kg for Token ${updated.tokenNumber}. Moving to Quality Lab.`,
+        "info"
+      );
+    } else if (stage === "QUALITY_CHECK") {
+      updated.stageDetails = "Moisture: 14.2% (Permissible <17%). Foreign matter: 0.8%. Grade A Certified.";
+      await this.triggerProcurementAlert(
+        "Quality Test Passed: Grade A",
+        `Moisture is 14.2% (optimal). Produce accepted under standard FAQ norms.`,
+        "info"
+      );
+    } else if (stage === "PROCUREMENT_COMPLETED") {
+      updated.completedAt = "11:40 AM";
+      updated.stageDetails = "Procurement intake voucher closed. Purchase Receipt: KS-LKO-2026-9142.";
+      await this.triggerProcurementAlert(
+        "Your procurement has been completed.",
+        `1,480 kg Paddy successfully accepted at MSP ₹2,300/Q. Amount: ₹34,040.`,
+        "urgent"
+      );
+    } else if (stage === "PAYMENT_INITIATED") {
+      updated.paymentStatus = "PROCESSING";
+      updated.stageDetails = "DBT Transfer file sent to PFMS. Expected credit within 24-48 hours.";
+      await this.triggerProcurementAlert(
+        "Payment has been initiated.",
+        `₹34,040 DBT transfer dispatched via PFMS to SBI A/C •••• 4092.`,
+        "urgent"
+      );
+    } else if (stage === "PAYMENT_RECEIVED") {
+      updated.paymentStatus = "PAID";
+      updated.stageDetails = "₹34,040 successfully credited to bank account via DBT. UTR: RBI-9928104812.";
+      await this.triggerProcurementAlert(
+        "Payment Credited: ₹34,040",
+        `Funds credited to your SBI account •••• 4092. Mandi transaction complete.`,
+        "urgent"
+      );
+    }
+
+    await this.saveBooking(updated);
+    return updated;
+  },
+
+  async getPaymentDetails(bookingId?: string): Promise<ProcurementPayment> {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem(PAYMENT_STORAGE_KEY);
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch (e) {}
+      }
+    }
+    return INITIAL_DEFAULT_PAYMENT;
+  },
+
+  async savePaymentDetails(payment: ProcurementPayment): Promise<void> {
+    if (typeof window !== "undefined") {
+      localStorage.setItem(PAYMENT_STORAGE_KEY, JSON.stringify(payment));
+    }
+  },
+
+  async triggerProcurementAlert(title: string, message: string, priority: "info" | "warning" | "urgent" = "info"): Promise<void> {
+    const newAlert: AlertNotification = {
+      id: `alt-proc-${Date.now()}`,
+      category: "farm",
+      title,
+      message,
+      timestamp: "Just now",
+      read: false,
+      priority,
+      actionUrl: "/farmer/procurement",
+    };
+    const currentAlerts = await alertApi.getAlerts();
+    const updated = [newAlert, ...currentAlerts];
+    if (typeof window !== "undefined") {
+      localStorage.setItem("kisan_alerts", JSON.stringify(updated));
+    }
+  },
+
+  /* Demo Simulation Controls */
+  async advanceServingToken(): Promise<{ servingNum: number; queueState: QueueLiveState; booking: ProcurementBooking }> {
+    let servingNum = 130;
+    if (typeof window !== "undefined") {
+      const savedServing = localStorage.getItem(QUEUE_SERVING_KEY);
+      if (savedServing) {
+        servingNum = parseInt(savedServing, 10) || 130;
+      }
+    }
+    const newServingNum = servingNum + 1;
+    if (typeof window !== "undefined") {
+      localStorage.setItem(QUEUE_SERVING_KEY, newServingNum.toString());
+    }
+
+    const booking = await this.getActiveBooking();
+    const tokenNum = parseInt(booking.tokenNumber.replace(/\D/g, ""), 10) || 142;
+    const newPos = Math.max(0, tokenNum - newServingNum);
+    const wait = Math.max(0, Math.round((newPos / 4) * 4.2));
+
+    const updatedBooking: ProcurementBooking = {
+      ...booking,
+      queuePosition: newPos,
+      estimatedWaitMinutes: wait,
+    };
+    await this.saveBooking(updatedBooking);
+
+    if (newPos === 5) {
+      await this.triggerProcurementAlert(
+        `Current queue position: 5`,
+        `Your token ${booking.tokenNumber} is approaching. Estimated wait reduced to ~18 minutes.`,
+        "warning"
+      );
+    } else if (newPos === 1) {
+      await this.triggerProcurementAlert(
+        `Your token ${booking.tokenNumber} is approaching.`,
+        `Please move to Mandi Intake Gate 1. Token A${newServingNum} is finishing.`,
+        "urgent"
+      );
+    } else if (newPos === 0) {
+      await this.triggerProcurementAlert(
+        `Token ${booking.tokenNumber} Called!`,
+        `Please drive to Weighbridge Counter 2 immediately.`,
+        "urgent"
+      );
+    }
+
+    const queueState = await this.getLiveQueue();
+    return { servingNum: newServingNum, queueState, booking: updatedBooking };
+  },
+
+  async resetDemo(): Promise<void> {
+    if (typeof window !== "undefined") {
+      localStorage.setItem(BOOKING_STORAGE_KEY, JSON.stringify(INITIAL_DEFAULT_BOOKING));
+      localStorage.setItem(PAYMENT_STORAGE_KEY, JSON.stringify(INITIAL_DEFAULT_PAYMENT));
+      localStorage.setItem(QUEUE_SERVING_KEY, "130");
+    }
+  },
+};
+

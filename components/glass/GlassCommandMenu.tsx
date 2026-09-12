@@ -18,6 +18,7 @@ import {
   Moon,
   X,
   Sparkles,
+  Scale,
 } from "lucide-react";
 import { useTranslation } from "@/lib/i18n";
 import { useTheme } from "@/lib/theme";
@@ -52,6 +53,16 @@ export const GlassCommandMenu: React.FC = () => {
   }, [isOpen]);
 
   const items: CommandItem[] = [
+    {
+      id: "nav-procurement",
+      title: "Smart Procurement - Live Queue & Token Tracker (SIH Core)",
+      category: "Navigation",
+      icon: <Scale className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />,
+      action: () => {
+        router.push("/farmer/procurement");
+        setIsOpen(false);
+      },
+    },
     {
       id: "nav-crops",
       title: "My Crops & Lifecycle Tracker",

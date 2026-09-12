@@ -28,6 +28,7 @@
   },
   "nav": {
     "home": "Dashboard",
+    "smartProcurement": "Smart Procurement",
     "myFarm": "My Farm",
     "myCrops": "My Crops",
     "cropDoctor": "Crop Doctor",

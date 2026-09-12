@@ -24,6 +24,7 @@ import {
   Users,
   BarChart3,
   Calendar,
+  Scale,
 } from "lucide-react";
 import { useSession } from "@/lib/auth";
 import { useTranslation } from "@/lib/i18n";
@@ -35,6 +36,12 @@ export const GlassSidebar: React.FC = () => {
 
   const farmerNav = [
     { href: "/farmer", label: t("nav.home"), icon: LayoutDashboard },
+    {
+      href: "/farmer/procurement",
+      label: "Smart Procurement",
+      icon: Scale,
+      isCore: true,
+    },
     { href: "/farmer/farm", label: t("nav.myFarm"), icon: Tractor },
     { href: "/farmer/crops", label: t("nav.myCrops"), icon: Sprout },
     { href: "/farmer/crop-doctor", label: t("nav.cropDoctor"), icon: Stethoscope },
@@ -59,6 +66,7 @@ export const GlassSidebar: React.FC = () => {
 
   const adminNav = [
     { href: "/admin", label: t("nav.home"), icon: LayoutDashboard },
+    { href: "/admin/procurement", label: "Smart Procurement Control", icon: Scale, isCore: true },
     { href: "/admin/farmers", label: t("nav.farmers"), icon: Users },
     { href: "/admin/experts", label: t("nav.experts"), icon: UserCheck },
     { href: "/admin/schemes", label: t("nav.schemes"), icon: Landmark },
@@ -106,6 +114,13 @@ export const GlassSidebar: React.FC = () => {
                   }`}
                 />
                 <span className="truncate">{item.label}</span>
+                {(item as any).isCore && (
+                  <span className={`ml-auto text-[9px] font-extrabold px-1.5 py-0.2 rounded-full uppercase tracking-wider ${
+                    isActive ? "bg-white/25 text-white" : "bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 border border-emerald-500/30"
+                  }`}>
+                    CORE
+                  </span>
+                )}
               </Link>
             );
           })}

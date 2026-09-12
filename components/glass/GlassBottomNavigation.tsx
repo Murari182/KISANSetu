@@ -20,6 +20,7 @@ import {
   UserCheck,
   Bell,
   Settings,
+  Scale,
 } from "lucide-react";
 import { useTranslation } from "@/lib/i18n";
 import { useSession } from "@/lib/auth";
@@ -40,7 +41,7 @@ export const GlassBottomNavigation: React.FC = () => {
         <div className="rounded-3xl bg-white/85 dark:bg-[#0d1511]/85 backdrop-blur-2xl border border-white/80 dark:border-white/10 shadow-[0_12px_36px_rgba(0,0,0,0.12)] dark:shadow-[0_12px_36px_rgba(0,0,0,0.6)] px-2 py-1.5 flex items-center justify-around">
           <Link
             href="/farmer"
-            className={`flex flex-col items-center py-1 px-3 rounded-2xl transition-all ${
+            className={`flex flex-col items-center py-1 px-2.5 rounded-2xl transition-all ${
               pathname === "/farmer"
                 ? "text-emerald-700 dark:text-emerald-400 font-bold"
                 : "text-foreground/60"
@@ -51,15 +52,16 @@ export const GlassBottomNavigation: React.FC = () => {
           </Link>
 
           <Link
-            href="/farmer/farm"
-            className={`flex flex-col items-center py-1 px-3 rounded-2xl transition-all ${
-              pathname === "/farmer/farm"
+            href="/farmer/procurement"
+            className={`flex flex-col items-center py-1 px-2.5 rounded-2xl transition-all relative ${
+              pathname.startsWith("/farmer/procurement")
                 ? "text-emerald-700 dark:text-emerald-400 font-bold"
-                : "text-foreground/60"
+                : "text-foreground/75"
             }`}
           >
-            <Tractor className="w-5 h-5" />
-            <span className="text-[10px] mt-0.5">{t("nav.myFarm")}</span>
+            <Scale className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+            <span className="text-[10px] mt-0.5 font-semibold">Procure</span>
+            <span className="absolute -top-1 right-1 w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
           </Link>
 
           {/* Centered highlighted Kisan AI button */}
@@ -77,7 +79,7 @@ export const GlassBottomNavigation: React.FC = () => {
 
           <Link
             href="/farmer/market"
-            className={`flex flex-col items-center py-1 px-3 rounded-2xl transition-all ${
+            className={`flex flex-col items-center py-1 px-2.5 rounded-2xl transition-all ${
               pathname === "/farmer/market"
                 ? "text-emerald-700 dark:text-emerald-400 font-bold"
                 : "text-foreground/60"
@@ -89,7 +91,7 @@ export const GlassBottomNavigation: React.FC = () => {
 
           <button
             onClick={() => setIsMoreOpen(true)}
-            className="flex flex-col items-center py-1 px-3 rounded-2xl text-foreground/60 hover:text-foreground transition-all"
+            className="flex flex-col items-center py-1 px-2.5 rounded-2xl text-foreground/60 hover:text-foreground transition-all"
           >
             <Menu className="w-5 h-5" />
             <span className="text-[10px] mt-0.5">{t("nav.more")}</span>
@@ -122,6 +124,8 @@ export const GlassBottomNavigation: React.FC = () => {
 
             <div className="grid grid-cols-3 gap-3 pb-8">
               {[
+                { href: "/farmer/procurement", label: "Smart Procurement", icon: Scale, color: "text-emerald-700 font-bold" },
+                { href: "/farmer/farm", label: t("nav.myFarm"), icon: Tractor, color: "text-emerald-600" },
                 { href: "/farmer/crops", label: t("nav.myCrops"), icon: Sprout, color: "text-emerald-600" },
                 { href: "/farmer/crop-doctor", label: t("nav.cropDoctor"), icon: Stethoscope, color: "text-rose-600" },
                 { href: "/farmer/weather", label: t("nav.weather"), icon: CloudSun, color: "text-amber-500" },

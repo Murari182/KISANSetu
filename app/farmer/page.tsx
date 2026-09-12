@@ -26,6 +26,9 @@ import {
   HelpCircle,
   RefreshCw,
   Tractor,
+  Scale,
+  QrCode,
+  Ticket,
 } from "lucide-react";
 import { GlassCard } from "@/components/glass/GlassCard";
 import { GlassButton } from "@/components/glass/GlassButton";
@@ -34,8 +37,8 @@ import { GlassProgress } from "@/components/glass/GlassBadge";
 import { useSession } from "@/lib/auth";
 import { useTranslation } from "@/lib/i18n";
 import { useToast } from "@/lib/toast";
-import { weatherApi, cropApi, alertApi, marketApi } from "@/lib/api";
-import { WeatherData, Crop, AlertNotification, MarketPrice, Farm } from "@/types";
+import { weatherApi, cropApi, alertApi, marketApi, procurementApi } from "@/lib/api";
+import { WeatherData, Crop, AlertNotification, MarketPrice, Farm, ProcurementBooking } from "@/types";
 
 interface DailyAction {
   id: string;
@@ -58,6 +61,7 @@ export default function FarmerDashboard() {
   const [crops, setCrops] = useState<Crop[]>([]);
   const [alerts, setAlerts] = useState<AlertNotification[]>([]);
   const [marketSnapshot, setMarketSnapshot] = useState<MarketPrice[]>([]);
+  const [procurementBooking, setProcurementBooking] = useState<ProcurementBooking | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   // Dynamic daily actions based on active crops
@@ -66,15 +70,17 @@ export default function FarmerDashboard() {
   useEffect(() => {
     setIsLoading(true);
 
-    // Fetch weather, crops, alerts, and market snapshot via typed services
+    // Fetch weather, crops, alerts, market snapshot, and active procurement booking via typed services
     Promise.all([
       weatherApi.getWeather(activeFarm?.district || "Lucknow"),
       cropApi.getCrops(activeFarm?.id),
       alertApi.getAlerts(),
       marketApi.getMarketPrices(),
+      procurementApi.getActiveBooking(),
     ])
-      .then(([weatherRes, cropsRes, alertsRes, marketRes]) => {
+      .then(([weatherRes, cropsRes, alertsRes, marketRes, procRes]) => {
         setWeather(weatherRes);
+        setProcurementBooking(procRes);
 
         // Check if there are user-created crops in localStorage from onboarding
         const localSavedCrops = localStorage.getItem("kisan_crops");
@@ -310,6 +316,69 @@ export default function FarmerDashboard() {
               </div>
             </div>
           )}
+        </div>
+      </section>
+
+      {/* SMART PROCUREMENT PRIMARY SPOTLIGHT (SIH CORE FEATURE) */}
+      <section className="rounded-3xl p-5 sm:p-6 bg-gradient-to-br from-emerald-500/15 via-white/80 dark:via-[#0e1712]/80 to-emerald-500/10 border-2 border-emerald-500/40 backdrop-blur-xl shadow-[0_12px_36px_rgba(16,185,129,0.1)] relative overflow-hidden">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+          <div className="flex items-start gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-emerald-700 dark:bg-emerald-600 text-white flex items-center justify-center shadow-md shrink-0">
+              <Scale className="w-6 h-6 text-emerald-100" />
+            </div>
+            <div>
+              <div className="flex flex-wrap items-center gap-2 mb-1">
+                <span className="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-emerald-600 text-white shadow-xs">
+                  ⭐ PRIMARY CORE FEATURE
+                </span>
+                <span className="text-xs font-bold text-emerald-800 dark:text-emerald-300 flex items-center gap-1">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  &ldquo;Arrive with certainty.&rdquo;
+                </span>
+              </div>
+              <h3 className="text-lg sm:text-xl font-black text-foreground tracking-tight">
+                Smart Procurement & Live Mandi Queue
+              </h3>
+              <p className="text-xs text-foreground/70 mt-0.5 max-w-xl">
+                Zero waiting uncertainty: Reserve digital intake slots, receive biometric QR token passes, and track live weighbridge queue call times in real-time.
+              </p>
+            </div>
+          </div>
+
+          {/* Quick Token & Status Snippet */}
+          <div className="flex flex-wrap items-center gap-3">
+            {procurementBooking ? (
+              <div className="flex items-center gap-3 p-2.5 px-3.5 rounded-2xl bg-white/90 dark:bg-[#131e18] border border-black/10 dark:border-white/10 shadow-xs">
+                <div className="text-right">
+                  <span className="text-[10px] text-foreground/50 uppercase font-bold block">
+                    Active Token
+                  </span>
+                  <span className="font-mono font-black text-base text-emerald-700 dark:text-emerald-400">
+                    {procurementBooking.tokenNumber}
+                  </span>
+                </div>
+                <div className="h-7 w-px bg-black/10 dark:bg-white/10" />
+                <div>
+                  <span className="text-[10px] text-foreground/50 uppercase font-bold block">
+                    Queue Wait
+                  </span>
+                  <span className="font-bold text-xs text-foreground">
+                    ~{procurementBooking.estimatedWaitMinutes}m ({procurementBooking.queuePosition} ahead)
+                  </span>
+                </div>
+              </div>
+            ) : null}
+
+            <Link href="/farmer/procurement">
+              <GlassButton
+                variant="primary"
+                size="md"
+                iconRight={<ArrowRight className="w-4 h-4" />}
+              >
+                Enter Smart Procurement
+              </GlassButton>
+            </Link>
+          </div>
         </div>
       </section>
 
